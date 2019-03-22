@@ -1,6 +1,10 @@
 # pi_video_looper
 Application to turn your Raspberry Pi into a dedicated looping video playback device.
 
+#### new in v1.2.2
+ - option for wait time between videos
+ - added enable.sh
+
 #### new in v1.2.1
  - option for displaying an image instead of a blank screen between videos
 

@@ -55,6 +55,8 @@ class VideoLooper(object):
         self._keyboard_control = self._config.getboolean('video_looper', 'keyboard_control')
         # Get seconds for countdown from config
         self._countdown_time = self._config.getint('video_looper', 'countdown_time')
+        # Get seconds for waittime bewteen files from config
+        self._wait_time = self._config.getint('video_looper', 'wait_time')
         # Parse string of 3 comma separated values like "255, 255, 255" into
         # list of ints for colors.
         self._bgcolor = list(map(int, self._config.get('video_looper', 'bgcolor')
@@ -103,10 +105,10 @@ class VideoLooper(object):
         """Load the configured background image and return an instance of it."""
         image = None
         if self._config.has_option('video_looper', 'bgimage'):
-            image = self._config.get('video_looper', 'bgimage')
-            if not image:
-                self._print('Using ' + str(image) + ' as a background')
-                image = pygame.image.load(image)
+            imagepath = self._config.get('video_looper', 'bgimage')
+            if imagepath != "" and os.path.isfile(imagepath):
+                self._print('Using ' + str(imagepath) + ' as a background')
+                image = pygame.image.load(imagepath)
                 image = pygame.transform.scale(image, self._size)
         return image
 
@@ -249,9 +251,12 @@ class VideoLooper(object):
             # Load and play a new movie if nothing is playing.
             if not self._player.is_playing():
                 movie = playlist.get_next()
+                if self._wait_time > 0:
+                    time.sleep(self._wait_time)
                 if movie is not None:
                     # Start playing the first available movie.
                     self._print('Playing movie: {0}'.format(movie))
+                    # todo: maybe clear screen to black so that background (image/color) is not visible for videos with a resolution that is < screen resolution
                     self._player.play(movie, loop=playlist.length() == 1, vol = self._sound_vol)
             # Check for changes in the file search path (like USB drives added)
             # and rebuild the playlist.
