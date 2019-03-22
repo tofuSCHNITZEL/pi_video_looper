@@ -1,7 +1,7 @@
 # Copyright 2019 bitconnect
 # Author: Tobias Perschon
 # License: GNU GPLv2, see LICENSE.txt
-class DirectoryReader(object):
+class DirectoryReader:
 
     def __init__(self, config):
         """Create an instance of a file reader that just reads a single

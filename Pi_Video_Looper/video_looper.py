@@ -13,7 +13,6 @@ import pygame
 
 from .model import Playlist, Movie
 
-
 # Basic video looper architecure:
 #
 # - VideoLooper class contains all the main logic for running the looper program.
@@ -37,7 +36,7 @@ from .model import Playlist, Movie
 # - Future file readers and video players can be provided and referenced in the
 #   config to extend the video player use to read from different file sources
 #   or use different video players.
-class VideoLooper(object):
+class VideoLooper:
 
     def __init__(self, config_path):
         """Create an instance of the main video looper application class. Must
@@ -232,7 +231,6 @@ class VideoLooper(object):
         self._screen.fill(self._bgcolor)
         self._screen.blit(label, (sw/2-lw/2, sh/2-lh/2))
         pygame.display.update()
-
 
     def _prepare_to_run_playlist(self, playlist):
         """Display messages when a new playlist is loaded."""

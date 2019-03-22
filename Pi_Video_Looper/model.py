@@ -3,7 +3,6 @@
 # License: GNU GPLv2, see LICENSE.txt
 import random
 
-
 class Movie:
     """Representation of a movie"""
 

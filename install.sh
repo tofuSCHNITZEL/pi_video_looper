@@ -36,6 +36,7 @@ echo "=================================="
 mkdir -p /mnt/usbdrive0 # This is very important if you put your system in readonly after
 pip3 install setuptools
 python3 setup.py install --force
+
 cp ./assets/video_looper.ini /boot/video_looper.ini
 
 echo "Configuring video_looper to run on start..."
