@@ -24,13 +24,17 @@ class HelloVideoPlayer(object):
         """Return list of supported file extensions."""
         return self._extensions
 
-    def play(self, movie, loop=False, **kwargs):
+    def play(self, movie, loop=0, **kwargs):
         """Play the provided movied file, optionally looping it repeatedly."""
         self.stop(3)  # Up to 3 second delay to let the old player stop.
         # Assemble list of arguments.
         args = ['hello_video.bin']
-        if loop:
+        if loop <= -1:
             args.append('--loop')         # Add loop parameter if necessary.
+        elif loop > 0:
+            args.append('--loop={0}'.format(loop))
+        #loop=0 means no loop
+
         args.append(movie)                # Add movie file path.
         # Run hello_video process and direct standard output to /dev/null.
         self._process = subprocess.Popen(args,
@@ -44,7 +48,7 @@ class HelloVideoPlayer(object):
         self._process.poll()
         return self._process.returncode is None
 
-    def stop(self, block_timeout_sec=None):
+    def stop(self, block_timeout_sec=0):
         """Stop the video player.  block_timeout_sec is how many seconds to
         block waiting for the player to stop before moving on.
         """
@@ -62,6 +66,10 @@ class HelloVideoPlayer(object):
             time.sleep(0)
         # Let the process be garbage collected.
         self._process = None
+
+    @staticmethod
+    def can_loop_count():
+        return True
 
 
 def create_player(config):

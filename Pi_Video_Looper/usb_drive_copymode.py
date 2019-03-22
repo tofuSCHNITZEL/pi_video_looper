@@ -59,9 +59,9 @@ class USBDriveReaderCopy(object):
         self._password = config.get('copymode', 'password')
 
         #needs to be changed to a more generic approach to support other players
-        self._extensions = config.get('omxplayer', 'extensions') \
+        self._extensions = '|'.join(config.get(self._config.get('video_looper', 'video_player'), 'extensions') \
                                  .translate(str.maketrans('','', ' \t\r\n.')) \
-                                 .split(',')
+                                 .split(','))
 
     def copy_files(self, paths):
         self.clear_screen()
@@ -92,18 +92,17 @@ class USBDriveReaderCopy(object):
             #inform about copymode
             self.draw_info_text("Mode: " + copy_mode + " " + copy_mode_info)
 
-            for ex in self._extensions:
-                if copy_mode == "replace":
-                    # iterate over target path:
-                    for x in os.listdir(self._target_path):
-                        if re.search('\.{0}$'.format(ex), x,flags=re.IGNORECASE) and (x[0] is not '.'):
-                            os.remove('{0}/{1}'.format(self._target_path.rstrip('/'), x))
+            if copy_mode == "replace":
+                # iterate over target path for deleting:
+                for x in os.listdir(self._target_path):
+                    if x[0] is not '.' and re.search('\.{0}$'.format(self._extensions), x, flags=re.IGNORECASE):
+                        os.remove('{0}/{1}'.format(self._target_path.rstrip('/'), x))
 
-                # iterate over source path:
-                for x in os.listdir(path):
-                    if re.search('\.{0}$'.format(ex), x,flags=re.IGNORECASE) and (x[0] is not '.'):
-                        #copy file
-                        self.copy_with_progress('{0}/{1}'.format(path.rstrip('/'), x), '{0}/{1}'.format(self._target_path.rstrip('/'), x))
+            # iterate over source path for copying:
+            for x in os.listdir(path):
+                if x[0] is not '.' and re.search('\.{0}$'.format(self._extensions), x, flags=re.IGNORECASE):
+                    #copy file
+                    self.copy_with_progress('{0}/{1}'.format(path.rstrip('/'), x), '{0}/{1}'.format(self._target_path.rstrip('/'), x))
 
             #copy loader image
             if self._copyloader:

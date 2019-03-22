@@ -31,7 +31,7 @@ from .model import Playlist, Movie
 #   for the two provided file readers and their public interface.
 #
 # - Similarly a video player modules needs to define a top level create_player
-#   function that takes in configuration.  See omxplayer.py
+#   function that takes in configuration.  See omxplayer.py and hello_video.py
 #   for the two provided video players and their public interface.
 #
 # - Future file readers and video players can be provided and referenced in the
@@ -84,6 +84,8 @@ class VideoLooper(object):
         self._small_font = pygame.font.Font(None, 50)
         self._big_font   = pygame.font.Font(None, 250)
         self._running    = True
+        #used for not waiting the first time
+        self._firstStart = True
 
     def _print(self, message):
         """Print message to standard output if console output is enabled."""
@@ -93,12 +95,12 @@ class VideoLooper(object):
     def _load_player(self):
         """Load the configured video player and return an instance of it."""
         module = self._config.get('video_looper', 'video_player')
-        return importlib.import_module('.' + module, 'Bitconnect_Video_Looper').create_player(self._config)
+        return importlib.import_module('.' + module, 'Pi_Video_Looper').create_player(self._config)
 
     def _load_file_reader(self):
         """Load the configured file reader and return an instance of it."""
         module = self._config.get('video_looper', 'file_reader')
-        return importlib.import_module('.' + module, 'Bitconnect_Video_Looper').create_file_reader(self._config, self._screen)
+        return importlib.import_module('.' + module, 'Pi_Video_Looper').create_file_reader(self._config, self._screen)
 
     def _load_bgimage(self):
         """Load the configured background image and return an instance of it."""
@@ -237,6 +239,7 @@ class VideoLooper(object):
         # If there are movies to play show a countdown first (if OSD enabled),
         # or if no movies are available show the idle message.
         self._blank_screen()
+        self._firstStart = True
         if playlist.length() > 0:
             self._animate_countdown(playlist)
             self._blank_screen()
@@ -248,47 +251,65 @@ class VideoLooper(object):
         # Get playlist of movies to play from file reader.
         playlist = self._build_playlist()
         self._prepare_to_run_playlist(playlist)
-        movie = None
+        movie = playlist.get_next()
         # Main loop to play videos in the playlist and listen for file changes.
         while self._running:
             # Load and play a new movie if nothing is playing.
             if not self._player.is_playing():
-                if movie is not None:
+                if movie is not None: #just to avoid errors
+
                     if movie.playcount >= movie.repeats:
                         movie.clear_playcount()
                         movie = playlist.get_next()
-                    if self._wait_time > 0:
-                        time.sleep(self._wait_time)
+                    elif self._player.can_loop_count() and movie.playcount > 0:
+                        movie.clear_playcount()
+                        movie = playlist.get_next()
 
                     movie.was_played()
+
+                    if self._wait_time > 0 and not self._firstStart:
+                        self._print('Waiting for: {0} seconds'.format(self._wait_time))
+                        time.sleep(self._wait_time)
+                    self._firstStart = False
+
+                    #generating infotext
+                    if self._player.can_loop_count():
+                        infotext = '{0} time{1} (player counts loops)'.format(movie.repeats, "s" if movie.repeats>1 else "")
+                    else:
+                        infotext = '{0}/{1}'.format(movie.playcount, movie.repeats)
+                    if playlist.length()==1:
+                        infotext = '(endless loop)'
+
                     # Start playing the first available movie.
-                    self._print('Playing movie: {0} {1}/{2} '.format(movie, movie.playcount, movie.repeats))
+                    self._print('Playing movie: {0} {1}'.format(movie, infotext))
                     # todo: maybe clear screen to black so that background (image/color) is not visible for videos with a resolution that is < screen resolution
-                    self._player.play(movie.filename, loop=playlist.length() == 1, vol = self._sound_vol)
-                else:
-                    #first initialization necessary
-                    movie = playlist.get_next()
+                    self._player.play(movie.filename, loop=-1 if playlist.length()==1 else movie.repeats, vol = self._sound_vol)
 
             # Check for changes in the file search path (like USB drives added)
             # and rebuild the playlist.
             if self._reader.is_changed():
+                self._print("reader changed, stopping player")
                 self._player.stop(3)  # Up to 3 second delay waiting for old 
                                       # player to stop.
+                self._print("player stopped")
                 # Rebuild playlist and show countdown again (if OSD enabled).
                 playlist = self._build_playlist()
                 self._prepare_to_run_playlist(playlist)
+                movie = playlist.get_next()
             # Event handling for key press, if keyboard control is enabled
             if self._keyboard_control:
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
                         # If pressed key is ESC quit program
                         if event.key == pygame.K_ESCAPE:
+                            self._print("ESC was pressed. quitting...")
                             self.quit()
             # Give the CPU some time to do other tasks.
             time.sleep(0.002)
 
     def quit(self):
         """Shut down the program"""
+        self._print("quitting Video Looper")
         self._running = False
         if self._player is not None:
             self._player.stop()
@@ -296,6 +317,7 @@ class VideoLooper(object):
 
     def signal_quit(self, signal, frame):
         """Shut down the program, meant to by called by signal handler."""
+        self._print("received signal to quit")
         self.quit()
 
 

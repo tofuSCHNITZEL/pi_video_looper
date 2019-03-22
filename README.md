@@ -1,11 +1,17 @@
 # pi_video_looper
 Application to turn your Raspberry Pi into a dedicated looping video playback device.
 
+#### new in v1.2.5
+ - hello_video now has an internal loop counter, so there will be no gap between each iteration of a video (also no wait_time)
+ - wait_time is skipped if the playlist is starting for the first time
+ - use generic application name
+
+
 #### new in v1.2.4
  - hello_video returns with no_hello_video option for install.sh in case building should fail again
 
 #### new in v1.2.3
- - add \_repeat_Nx_ to any file to have the file repeated N times before playing the next file
+ - add \_repeat_Nx to any file to have the file repeated N times before playing the next file
 
 #### new in v1.2.2
  - option for wait time between videos
@@ -33,6 +39,14 @@ this ini setting can be overruled by placing a file named "replace" or "add" on 
 the default mode is "replace"
 
 Note: files with the same name always get overwritten
+
+#### notable things:
+* you can have one video repeated X times before playing the next by adding _repeat_Nx to the filename of a video ,
+where N is a positive number
+    * with hello_video there is no gap when a video is repeated but there is a small gap between different videos
+    * with omxplayer there will also be a short gap between the repeats
+    
+* if you have only one video then omxplayer can also loop seamlessly (and wth audio)
 
 #### how to install:
 sudo ./install.sh
