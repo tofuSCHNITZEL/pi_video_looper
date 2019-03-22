@@ -9,10 +9,9 @@ import re
 import sys
 import signal
 import time
-
 import pygame
 
-from .model import Playlist
+from .model import Playlist, Movie
 
 
 # Basic video looper architecure:
@@ -81,7 +80,7 @@ class VideoLooper(object):
         # default value to 0 millibels (omxplayer)
         self._sound_vol = 0
         # Set other static internal state.
-        self._extensions = self._player.supported_extensions()
+        self._extensions = '|'.join(self._player.supported_extensions())
         self._small_font = pygame.font.Font(None, 50)
         self._big_font   = pygame.font.Font(None, 250)
         self._running    = True
@@ -127,25 +126,28 @@ class VideoLooper(object):
         paths = self._reader.search_paths()
         # Enumerate all movie files inside those paths.
         movies = []
-        for ex in self._extensions:
-            for path in paths:
-                # Skip paths that don't exist or are files.
-                if not os.path.exists(path) or not os.path.isdir(path):
-                    continue
-                # Ignore hidden files (useful when file loaded on usb
-                # key from an OSX computer
-                movies.extend(['{0}/{1}'.format(path.rstrip('/'), x) \
-                               for x in os.listdir(path) \
-                               if re.search('\.{0}$'.format(ex), x, 
-                                            flags=re.IGNORECASE) and \
-                               x[0] is not '.'])
-                # Get the video volume from the file in the usb key
-                sound_vol_file_path = '{0}/{1}'.format(path.rstrip('/'), self._sound_vol_file)
-                if os.path.exists(sound_vol_file_path):
-                    with open(sound_vol_file_path, 'r') as sound_file:
-                        sound_vol_string = sound_file.readline()
-                        if self._is_number(sound_vol_string):
-                            self._sound_vol = int(float(sound_vol_string))
+        for path in paths:
+            # Skip paths that don't exist or are files.
+            if not os.path.exists(path) or not os.path.isdir(path):
+                continue
+
+            for x in os.listdir(path):
+                # Ignore hidden files (useful when file loaded on usb key from an OSX computer
+                if x[0] is not '.' and re.search('\.{0}$'.format(self._extensions), x, flags=re.IGNORECASE):
+                    repeatsetting = re.search('_repeat_([0-9]*)x', x, flags=re.IGNORECASE)
+                    if (repeatsetting is not None):
+                        repeat = repeatsetting.group(1)
+                    else:
+                        repeat = 1
+                    movies.append(Movie('{0}/{1}'.format(path.rstrip('/'), x), repeat))
+
+            # Get the video volume from the file in the usb key
+            sound_vol_file_path = '{0}/{1}'.format(path.rstrip('/'), self._sound_vol_file)
+            if os.path.exists(sound_vol_file_path):
+                with open(sound_vol_file_path, 'r') as sound_file:
+                    sound_vol_string = sound_file.readline()
+                    if self._is_number(sound_vol_string):
+                        self._sound_vol = int(float(sound_vol_string))
         # Create a playlist with the sorted list of movies.
         return Playlist(sorted(movies), self._is_random)
 
@@ -246,18 +248,27 @@ class VideoLooper(object):
         # Get playlist of movies to play from file reader.
         playlist = self._build_playlist()
         self._prepare_to_run_playlist(playlist)
+        movie = None
         # Main loop to play videos in the playlist and listen for file changes.
         while self._running:
             # Load and play a new movie if nothing is playing.
             if not self._player.is_playing():
-                movie = playlist.get_next()
-                if self._wait_time > 0:
-                    time.sleep(self._wait_time)
                 if movie is not None:
+                    if movie.playcount >= movie.repeats:
+                        movie.clear_playcount()
+                        movie = playlist.get_next()
+                    if self._wait_time > 0:
+                        time.sleep(self._wait_time)
+
+                    movie.was_played()
                     # Start playing the first available movie.
-                    self._print('Playing movie: {0}'.format(movie))
+                    self._print('Playing movie: {0} {1}/{2} '.format(movie, movie.playcount, movie.repeats))
                     # todo: maybe clear screen to black so that background (image/color) is not visible for videos with a resolution that is < screen resolution
-                    self._player.play(movie, loop=playlist.length() == 1, vol = self._sound_vol)
+                    self._player.play(movie.filename, loop=playlist.length() == 1, vol = self._sound_vol)
+                else:
+                    #first initialization necessary
+                    movie = playlist.get_next()
+
             # Check for changes in the file search path (like USB drives added)
             # and rebuild the playlist.
             if self._reader.is_changed():
