@@ -1,13 +1,11 @@
-from ez_setup import use_setuptools
-use_setuptools()
 from setuptools import setup, find_packages
 
-setup(name              = 'Adafruit_Video_Looper',
-      version           = '1.0.0',
-      author            = 'Tony DiCola',
-      author_email      = 'tdicola@adafruit.com',
-      description       = 'Application to turn your Raspberry Pi into a dedicated looping video playback device, good for art installations, information displays, or just playing cat videos all day.',
+setup(name              = 'Bitconnect_Video_Looper',
+      version           = '1.2.0',
+      author            = 'Tobias Perschon',
+      author_email      = 'tp@bitconnect.at',
+      description       = 'Based on the Adafruit Video Looper this application turns your Raspberry Pi into a dedicated looping video playback device.',
       license           = 'GNU GPLv2',
-      url               = 'https://github.com/adafruit/pi_video_looper',
-      install_requires  = ['pyudev'],
+      url               = 'https://github.com/tofuSCHNITZEL/pi_video_looper',
+      install_requires  = ['pyudev','pygame'],
       packages          = find_packages())

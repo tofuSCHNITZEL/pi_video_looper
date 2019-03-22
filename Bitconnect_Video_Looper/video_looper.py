@@ -1,7 +1,8 @@
-# Copyright 2015 Adafruit Industries.
-# Author: Tony DiCola
+# Copyright 2019 bitconnect
+# Author: Tobias Perschon
 # License: GNU GPLv2, see LICENSE.txt
-import ConfigParser
+
+import configparser
 import importlib
 import os
 import re
@@ -11,7 +12,7 @@ import time
 
 import pygame
 
-from model import Playlist
+from .model import Playlist
 
 
 # Basic video looper architecure:
@@ -31,7 +32,7 @@ from model import Playlist
 #   for the two provided file readers and their public interface.
 #
 # - Similarly a video player modules needs to define a top level create_player
-#   function that takes in configuration.  See omxplayer.py and hello_video.py
+#   function that takes in configuration.  See omxplayer.py
 #   for the two provided video players and their public interface.
 #
 # - Future file readers and video players can be provided and referenced in the
@@ -44,36 +45,37 @@ class VideoLooper(object):
         pass path to a valid video looper ini configuration file.
         """
         # Load the configuration.
-        self._config = ConfigParser.SafeConfigParser()
+        self._config = configparser.ConfigParser()
         if len(self._config.read(config_path)) == 0:
             raise RuntimeError('Failed to find configuration file at {0}, is the application properly installed?'.format(config_path))
         self._console_output = self._config.getboolean('video_looper', 'console_output')
-        # Load configured video player and file reader modules.
-        self._player = self._load_player()
-        self._reader = self._load_file_reader()
         # Load other configuration values.
         self._osd = self._config.getboolean('video_looper', 'osd')
         self._is_random = self._config.getboolean('video_looper', 'is_random')
         self._keyboard_control = self._config.getboolean('video_looper', 'keyboard_control')
-        # Parse string of 3 comma separated values like "255, 255, 255" into 
+        # Get seconds for countdown from config
+        self._countdown_time = self._config.getint('video_looper', 'countdown_time')
+        # Parse string of 3 comma separated values like "255, 255, 255" into
         # list of ints for colors.
-        self._bgcolor = map(int, self._config.get('video_looper', 'bgcolor') \
-                                             .translate(None, ',') \
-                                             .split())
-        self._fgcolor = map(int, self._config.get('video_looper', 'fgcolor') \
-                                             .translate(None, ',') \
-                                             .split())
-        # Load sound volume file name value
-        self._sound_vol_file = self._config.get('omxplayer', 'sound_vol_file');
-        # default value to 0 millibels (omxplayer)
-        self._sound_vol = 0
+        self._bgcolor = list(map(int, self._config.get('video_looper', 'bgcolor')
+                                             .translate(str.maketrans('','', ','))
+                                             .split()))
+        self._fgcolor = list(map(int, self._config.get('video_looper', 'fgcolor')
+                                             .translate(str.maketrans('','', ','))
+                                             .split()))
         # Initialize pygame and display a blank screen.
         pygame.display.init()
         pygame.font.init()
         pygame.mouse.set_visible(False)
-        size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
-        self._screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
+        self._screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN | pygame.NOFRAME)
         self._blank_screen()
+        # Load configured video player and file reader modules.
+        self._player = self._load_player()
+        self._reader = self._load_file_reader()
+        # Load sound volume file name value
+        self._sound_vol_file = self._config.get('omxplayer', 'sound_vol_file')
+        # default value to 0 millibels (omxplayer)
+        self._sound_vol = 0
         # Set other static internal state.
         self._extensions = self._player.supported_extensions()
         self._small_font = pygame.font.Font(None, 50)
@@ -88,14 +90,12 @@ class VideoLooper(object):
     def _load_player(self):
         """Load the configured video player and return an instance of it."""
         module = self._config.get('video_looper', 'video_player')
-        return importlib.import_module('.' + module, 'Adafruit_Video_Looper') \
-            .create_player(self._config)
+        return importlib.import_module('.' + module, 'Bitconnect_Video_Looper').create_player(self._config)
 
     def _load_file_reader(self):
         """Load the configured file reader and return an instance of it."""
         module = self._config.get('video_looper', 'file_reader')
-        return importlib.import_module('.' + module, 'Adafruit_Video_Looper') \
-            .create_file_reader(self._config)
+        return importlib.import_module('.' + module, 'Bitconnect_Video_Looper').create_file_reader(self._config, self._screen)
 
     def _is_number(iself, s):
         try:
@@ -148,7 +148,7 @@ class VideoLooper(object):
             font = self._small_font
         return font.render(message, True, self._fgcolor, self._bgcolor)
 
-    def _animate_countdown(self, playlist, seconds=10):
+    def _animate_countdown(self, playlist):
         """Print text with the number of loaded movies and a quick countdown
         message if the on screen display is enabled.
         """
@@ -164,7 +164,7 @@ class VideoLooper(object):
         label1 = self._render_text(message + ' Starting playback in:')
         l1w, l1h = label1.get_size()
         sw, sh = self._screen.get_size()
-        for i in range(seconds, 0, -1):
+        for i in range(self._countdown_time, 0, -1):
             # Each iteration of the countdown rendering changing text.
             label2 = self._render_text(str(i), self._big_font)
             l2w, l2h = label2.get_size()
@@ -198,10 +198,25 @@ class VideoLooper(object):
             self._screen.blit(label2, (sw/2-l2w/2, sh/2-l2h/2+lh))
         pygame.display.update()
 
+    def display_message(self,message):
+        self._print(message)
+        # Do nothing else if the OSD is turned off.
+        if not self._osd:
+            return
+        # Display idle message in center of screen.
+        label = self._render_text(message)
+        lw, lh = label.get_size()
+        sw, sh = self._screen.get_size()
+        self._screen.fill(self._bgcolor)
+        self._screen.blit(label, (sw/2-lw/2, sh/2-lh/2))
+        pygame.display.update()
+
+
     def _prepare_to_run_playlist(self, playlist):
         """Display messages when a new playlist is loaded."""
         # If there are movies to play show a countdown first (if OSD enabled),
         # or if no movies are available show the idle message.
+        self._blank_screen()
         if playlist.length() > 0:
             self._animate_countdown(playlist)
             self._blank_screen()
@@ -254,7 +269,7 @@ class VideoLooper(object):
 
 # Main entry point.
 if __name__ == '__main__':
-    print('Starting Adafruit Video Looper.')
+    print('Starting Video Looper.')
     # Default config path to /boot.
     config_path = '/boot/video_looper.ini'
     # Override config path if provided as parameter.

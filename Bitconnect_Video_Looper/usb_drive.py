@@ -1,9 +1,9 @@
-# Copyright 2015 Adafruit Industries.
-# Author: Tony DiCola
+# Copyright 2019 bitconnect
+# Author: Tobias Perschon
 # License: GNU GPLv2, see LICENSE.txt
 import glob
 
-from usb_drive_mounter import USBDriveMounter
+from .usb_drive_mounter import USBDriveMounter
 
 
 class USBDriveReader(object):
@@ -41,6 +41,6 @@ class USBDriveReader(object):
         return 'Insert USB drive with compatible movies.'
 
 
-def create_file_reader(config):
+def create_file_reader(config, screen):
     """Create new file reader based on mounting USB drives."""
     return USBDriveReader(config)

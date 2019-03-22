@@ -1,5 +1,5 @@
-# Copyright 2015 Adafruit Industries.
-# Author: Tony DiCola
+# Copyright 2019 bitconnect
+# Author: Tobias Perschon
 # License: GNU GPLv2, see LICENSE.txt
 class DirectoryReader(object):
 
@@ -30,6 +30,6 @@ class DirectoryReader(object):
         return 'No files found in {0}'.format(self._path)
 
 
-def create_file_reader(config):
+def create_file_reader(config, screen):
     """Create new file reader based on reading a directory on disk."""
     return DirectoryReader(config)
