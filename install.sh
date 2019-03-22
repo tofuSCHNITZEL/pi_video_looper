@@ -14,6 +14,23 @@ echo "Installing dependencies..."
 echo "=========================="
 apt update && apt -y install python3 python3-pip python3-pygame supervisor omxplayer
 
+if [ "$*" != "no_hello_video" ]
+then
+	echo "Installing hello_video..."
+	echo "========================="
+	apt -y install git build-essential python3-dev
+	git clone https://github.com/adafruit/pi_hello_video.git
+	cd pi_hello_video
+	./rebuild.sh
+	cd hello_video
+	make install
+	cd ../..
+	rm -rf pi_hello_video
+else
+    echo "Installing without hello_video"
+    echo "=========================="
+fi
+
 echo "Installing video_looper program..."
 echo "=================================="
 mkdir -p /mnt/usbdrive0 # This is very important if you put your system in readonly after

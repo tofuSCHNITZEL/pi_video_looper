@@ -1,8 +1,11 @@
 # pi_video_looper
 Application to turn your Raspberry Pi into a dedicated looping video playback device.
 
+#### new in v1.2.4
+ - hello_video returns with no_hello_video option for install.sh in case building should fail again
+
 #### new in v1.2.3
- - add \_repeat_Nx to any file to have the file repeated N times before playing the next file
+ - add \_repeat_Nx_ to any file to have the file repeated N times before playing the next file
 
 #### new in v1.2.2
  - option for wait time between videos
