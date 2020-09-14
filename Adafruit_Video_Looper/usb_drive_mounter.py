@@ -64,23 +64,9 @@ class USBDriveMounter:
         drive change, otherwise false.
         """
         # Look for a drive change.
-        device = self._monitor.poll(0)
-        # If a USB drive changed (added/remove) remount all drives.
-        if device is not None and device['ID_BUS'] == 'usb':
-            return True
-        # Else nothing changed.
-        return False
-
-
-if __name__ == '__main__':
-    # Run as a service that mounts all USB drives as read-only under the default
-    # path of /mnt/usbdrive*.
-    drive_mounter = USBDriveMounter(readonly=True)
-    drive_mounter.mount_all()
-    drive_mounter.start_monitor()
-    print ('Listening for USB drive changes (press Ctrl-C to quit)...')
-    while True:
-        if drive_mounter.poll_changes():
-            print ('USB drives changed!')
-            drive_mounter.mount_all()
-        time.sleep(0)
+        for device in iter(self._monitor.poll, None):
+            # If a USB drive changed (added/remove) remount all drives.
+            if device is not None and device['ID_BUS'] == 'usb':
+                return True
+            # Else nothing changed.
+            return False

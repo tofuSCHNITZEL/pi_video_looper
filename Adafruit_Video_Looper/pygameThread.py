@@ -1,7 +1,7 @@
 from threading import Thread
 import pygame,os, time,sys
 import logging
-
+from .model import *
 
 class PygameThread(Thread):
 
@@ -19,10 +19,11 @@ class PygameThread(Thread):
                                              .split()))
 
         
-
+        self._keyboard_control = self._config.getboolean('video_looper', 'keyboard_control')
         self._bgimage = self._load_bgimage()
         self._screen = None
         self._run = True
+        self._tokenGen = ControlTokenFactory()
 
     def quit(self):
         self._run = False
@@ -35,7 +36,7 @@ class PygameThread(Thread):
             self._screen.blit(self._bgimage, rect)
         pygame.display.update()
 
-    def display_message(self,message):
+    def display_message(self, message):
         ##TODO##self._print(message)
         # Do nothing else if the OSD is turned off.
         #if not self._osd:
@@ -132,16 +133,17 @@ class PygameThread(Thread):
 
         while self._run:
             event = pygame.event.wait()
-            if event.type == pygame.KEYDOWN:
+            if self._keyboard_control and event.type == pygame.KEYDOWN:
                 # If pressed key is ESC quit program
                 if event.key == pygame.K_ESCAPE:
-                    print("ESC was pressed. quitting...")
-                    self._commandQueue.put("quit")
-                    #self._run=False
+                    logging.info("ESC was pressed. quitting...")
+                    self._commandQueue.put(self._tokenGen.createToken("global", "exit"))
                 if event.key == pygame.K_k:
-                    print("k was pressed. skipping...")
+                    logging.info("k was pressed. skipping...")
+                    self._commandQueue.put(self._tokenGen.createToken("player", "skip"))
                 if event.key == pygame.K_s:
-                    print("s was pressed. skipping...")
+                    logging.info("s was pressed. stopping...")    
+                    self._commandQueue.put(self._tokenGen.createToken("player", "stop"))
         
         logging.debug('quitting pygame')
         pygame.quit()

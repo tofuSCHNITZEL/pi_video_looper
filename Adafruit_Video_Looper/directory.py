@@ -2,6 +2,7 @@
 # Author: Tony DiCola
 # License: GNU GPLv2, see LICENSE.txt
 import os
+import watchdog
 
 class DirectoryReader:
 

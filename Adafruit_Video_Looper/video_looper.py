@@ -18,9 +18,11 @@ from pygame import key
 from multiprocessing import Queue
 
 from .alsa_config import parse_hw_device
-from .model import Playlist, Movie
+from .model import *
 from .playlist_builders import build_playlist_m3u
 from .pygameThread import PygameThread
+from .playerThread import PlayerThread
+from .filereaderThread import FileReaderThread
 
 
 # Basic video looper architecure:
@@ -62,23 +64,39 @@ class VideoLooper:
         self._console_output = True
         self._osd = self._config.getboolean('video_looper', 'osd')
         self._is_random = self._config.getboolean('video_looper', 'is_random')
-        self._keyboard_control = self._config.getboolean('video_looper', 'keyboard_control')
+        
+        self._tokenGen = ControlTokenFactory()
 
         # Get seconds for waittime bewteen files from config
         self._wait_time = self._config.getint('video_looper', 'wait_time')
 
         # Initialize pygame and display a blank screen.
         pygameReady = threading.Event()
-        logging.debug("starting pygame thread")
         self._pgT = PygameThread(self._config, pygameReady, self.commandQueue)
+        logging.debug("starting pygame thread")
         self._pgT.start()
-        logging.debug("waiting for pygame thread")
+        logging.debug("waiting for pygame thread warmup")
         pygameReady.wait()
         logging.debug("pygame ready")
 
-        # Load configured video player and file reader modules.
-        self._player = self._load_player()
-        self._reader = self._load_file_reader()
+        # Initialize player thread
+        playerReady = threading.Event()
+        self.plT = PlayerThread(self._config, playerReady, self.commandQueue)
+        logging.debug("starting player thread")
+        self.plT.start()
+        logging.debug("waiting for player thread warump")
+        playerReady.wait()
+        logging.debug("player ready")
+
+        # Initialize filereader thread
+        filereaderReady = threading.Event()
+        self.frT = FileReaderThread(self._config, filereaderReady, self.commandQueue)
+        logging.debug("starting filereader thread")
+        self.frT.start()
+        logging.debug("waiting for filereader thread warump")
+        filereaderReady.wait()
+        logging.debug("filereader ready")
+
         # Load ALSA hardware configuration.
         self._alsa_hw_device = parse_hw_device(self._config.get('alsa', 'hw_device'))
         self._alsa_hw_vol_control = self._config.get('alsa', 'hw_vol_control')
@@ -90,7 +108,7 @@ class VideoLooper:
         # default value to 0 millibels (omxplayer)
         self._sound_vol = 0
         # Set other static internal state.
-        self._extensions = '|'.join(self._player.supported_extensions())
+        #self._extensions = '|'.join(self._player.supported_extensions())
 
         self._running    = True
         self._playbackStopped = False
@@ -108,16 +126,6 @@ class VideoLooper:
         """Print message to standard output if console output is enabled."""
         if self._console_output:
             print(message)
-
-    def _load_player(self):
-        """Load the configured video player and return an instance of it."""
-        module = self._config.get('video_looper', 'video_player')
-        return importlib.import_module('.' + module, 'Adafruit_Video_Looper').create_player(self._config)
-
-    def _load_file_reader(self):
-        """Load the configured file reader and return an instance of it."""
-        module = self._config.get('video_looper', 'file_reader')
-        return importlib.import_module('.' + module, 'Adafruit_Video_Looper').create_file_reader(self._config, None)
 
     def _is_number(self, s):
         try:
@@ -236,32 +244,16 @@ class VideoLooper:
                 cmd.extend(('-c', str(self._alsa_hw_device[0])))
             cmd.extend(('set', self._alsa_hw_vol_control, '--', self._alsa_hw_vol))
             subprocess.check_call(cmd)
-            
-    def _handle_keyboard_shortcuts(self):
-        while self._running:
-            event = pygame.event.wait()
-            if event.type == pygame.key.KEYDOWN:
-                # If pressed key is ESC quit program
-                if event.key == pygame.key.K_ESCAPE:
-                    self._print("ESC was pressed. quitting...")
-                    self.quit()
-                if event.key == pygame.key.K_k:
-                    self._print("k was pressed. skipping...")
-                    self._player.stop(3)
-                if event.key == pygame.key.K_s:
-                    if self._playbackStopped:
-                        self._print("s was pressed. starting...")
-                        self._playbackStopped = False
-                    else:
-                        self._print("s was pressed. stopping...")
-                        self._playbackStopped = True
-                        self._player.stop(3)
 
     def run(self):
-        cmd = self.commandQueue.get()
-        print ("cmd:", cmd)
-        if(cmd == "quit"):
-            self.quit()
+        while self._running:
+            cmd = self.commandQueue.get()
+            if(isinstance(cmd, GlobalToken)):
+                if(cmd.getCmd() == "exit"):
+                    self.quit()
+            elif(isinstance(cmd, PlayerToken)):
+                print("playertoken: "+cmd.getCmd())
+
     def old_run(self):
         """Main program loop.  Will never return!"""
         # Get playlist of movies to play from file reader.

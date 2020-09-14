@@ -71,3 +71,44 @@ class Playlist:
     def length(self):
         """Return the number of movies in the playlist."""
         return len(self._movies)
+
+class ControlTokenFactory:
+    """ three types of tokens """
+    """ player, filereader, global """
+    tokenTypes = ["player", "filereader", "global"]
+
+    def createToken(self, tokentype, cmd):
+        """Returns Token type"""
+        if tokentype not in self.tokenTypes:
+            return False
+        targetclass = tokentype.capitalize()+"Token"
+        return globals()[targetclass](cmd)
+
+class ControlToken():
+    def __init__(self, cmd):
+        self.cmd = cmd
+
+    def getCmd(self):
+        return self.cmd
+
+    def __str__(self):
+        return "Type: "+str(self.__class__)+" cmd: "+self.cmd
+
+
+class PlayerToken(ControlToken):
+    cmds = ["play", "pause", "stop"]
+    def setCmd(self, cmd):
+        if cmd in self.cmds:
+            self.cmd = cmd
+
+class FilereaderToken(ControlToken):
+    cmds = ["refresh"]
+    def setCmd(self, cmd):
+        if cmd in self.cmds:
+            self.cmd = cmd
+
+class GlobalToken(ControlToken):
+    cmds = ["exit"]
+    def setCmd(self, cmd):
+        if cmd in self.cmds:
+            self.cmd = cmd
