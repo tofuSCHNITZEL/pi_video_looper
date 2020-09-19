@@ -67,10 +67,15 @@ class Playlist:
                 self._index = 0
 
         return self._movies[self._index]
-
-    def length(self):
-        """Return the number of movies in the playlist."""
+        
+    def __len__(self):
         return len(self._movies)
+
+    def __str__(self):
+        info = "Playlist: "
+        for movie in self._movies:
+            info = info + str(movie)
+        return info
 
 class ControlTokenFactory:
     """ three types of tokens """
@@ -101,14 +106,14 @@ class PlayerToken(ControlToken):
         if cmd in self.cmds:
             self.cmd = cmd
 
-class FilereaderToken(ControlToken):
-    cmds = ["refresh"]
-    def setCmd(self, cmd):
-        if cmd in self.cmds:
-            self.cmd = cmd
+#class FilereaderToken(ControlToken):
+#    cmds = ["reload"]
+#    def setCmd(self, cmd):
+#        if cmd in self.cmds:
+#            self.cmd = cmd
 
 class GlobalToken(ControlToken):
-    cmds = ["exit"]
+    cmds = ["exit", ""]
     def setCmd(self, cmd):
         if cmd in self.cmds:
             self.cmd = cmd

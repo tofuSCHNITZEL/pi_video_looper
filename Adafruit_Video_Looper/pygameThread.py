@@ -1,12 +1,12 @@
 from threading import Thread
-import pygame,os, time,sys
+import pygame, os, time,sys
 import logging
 from .model import *
 
 class PygameThread(Thread):
 
     def __init__(self, config, ready, commandQueue):
-        super().__init__()
+        super().__init__(name="PygameThread")
         self.ready = ready
         self._config = config
         self._commandQueue = commandQueue
@@ -26,7 +26,9 @@ class PygameThread(Thread):
         self._tokenGen = ControlTokenFactory()
 
     def quit(self):
-        self._run = False
+        logging.debug("quitting pygame thread")
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
+    
 
     def blank_screen(self):
         """Render a blank screen filled with the background color."""
@@ -144,6 +146,9 @@ class PygameThread(Thread):
                 if event.key == pygame.K_s:
                     logging.info("s was pressed. stopping...")    
                     self._commandQueue.put(self._tokenGen.createToken("player", "stop"))
-        
-        logging.debug('quitting pygame')
-        pygame.quit()
+            if event.type == pygame.QUIT:
+                self._run = False
+
+        pygame.display.quit()
+        pygame.font.quit()
+        logging.debug('pygame thread end')

@@ -13,7 +13,7 @@ import time
 import pygame
 import threading
 import logging
-from pygame import key 
+import traceback
 
 from multiprocessing import Queue
 
@@ -71,32 +71,43 @@ class VideoLooper:
         self._wait_time = self._config.getint('video_looper', 'wait_time')
 
         # Initialize pygame and display a blank screen.
-        pygameReady = threading.Event()
-        self._pgT = PygameThread(self._config, pygameReady, self.commandQueue)
-        logging.debug("starting pygame thread")
-        self._pgT.start()
-        logging.debug("waiting for pygame thread warmup")
-        pygameReady.wait()
-        logging.debug("pygame ready")
-
+        try:
+            pygameReady = threading.Event()
+            self._pgT = PygameThread(self._config, pygameReady, self.commandQueue)
+            logging.debug("starting pygame thread")
+            self._pgT.start()
+            logging.debug("waiting for pygame thread warmup")
+            #pygameReady.wait()
+            logging.debug("pygame ready")
+        except Exception as e:
+            logging.debug(e) 
+            self.quit()
         # Initialize player thread
-        playerReady = threading.Event()
-        self.plT = PlayerThread(self._config, playerReady, self.commandQueue)
-        logging.debug("starting player thread")
-        self.plT.start()
-        logging.debug("waiting for player thread warump")
-        playerReady.wait()
-        logging.debug("player ready")
+        try:
+            playerReady = threading.Event()
+            self._plT = PlayerThread(self._config, playerReady, self.commandQueue)
+            logging.debug("starting player thread")
+            self._plT.start()
+            logging.debug("waiting for player thread warump")
+            playerReady.wait()
+            logging.debug("player ready")
+        except Exception as e:
+            logging.debug(e) 
+            self.quit()
 
         # Initialize filereader thread
-        filereaderReady = threading.Event()
-        self.frT = FileReaderThread(self._config, filereaderReady, self.commandQueue)
-        logging.debug("starting filereader thread")
-        self.frT.start()
-        logging.debug("waiting for filereader thread warump")
-        filereaderReady.wait()
-        logging.debug("filereader ready")
-
+        try:
+            filereaderReady = threading.Event()
+            self._frT = FileReaderThread(self._config, filereaderReady, self.commandQueue)
+            logging.debug("starting filereader thread")
+            self._frT.start()
+            logging.debug("waiting for filereader thread warump")
+            filereaderReady.wait()
+            logging.debug("filereader ready")
+        except Exception as e:
+            logging.debug(e) 
+            self.quit()
+        
         # Load ALSA hardware configuration.
         self._alsa_hw_device = parse_hw_device(self._config.get('alsa', 'hw_device'))
         self._alsa_hw_vol_control = self._config.get('alsa', 'hw_vol_control')
@@ -108,6 +119,7 @@ class VideoLooper:
         # default value to 0 millibels (omxplayer)
         self._sound_vol = 0
         # Set other static internal state.
+        self._extensions = '|'.join(self._config.get('omxplayer','extensions'))
         #self._extensions = '|'.join(self._player.supported_extensions())
 
         self._running    = True
@@ -144,10 +156,10 @@ class VideoLooper:
                 if os.path.isabs(playlist_path):
                     if not os.path.isfile(playlist_path):
                         self._print('Playlist path {0} does not exist.'.format(playlist_path))
-                        return self._build_playlist_from_all_files()
+                        return self._build_playlist_from_path()
                         #raise RuntimeError('Playlist path {0} does not exist.'.format(playlist_path))
                 else:
-                    paths = self._reader.search_paths()
+                    paths = self._frT.get_paths()
                     
                     if not paths:
                         return Playlist([])
@@ -160,7 +172,7 @@ class VideoLooper:
                             break
                     else:
                         self._print('Playlist path {0} does not resolve to any file.'.format(playlist_path))
-                        return self._build_playlist_from_all_files()
+                        return self._build_playlist_from_path()
                         #raise RuntimeError('Playlist path {0} does not resolve to any file.'.format(playlist_path))
 
                 basepath, extension = os.path.splitext(playlist_path)
@@ -168,19 +180,19 @@ class VideoLooper:
                     return build_playlist_m3u(playlist_path)
                 else:
                     self._print('Unrecognized playlist format {0}.'.format(extension))
-                    return self._build_playlist_from_all_files()
+                    return self._build_playlist_from_path()
                     #raise RuntimeError('Unrecognized playlist format {0}.'.format(extension))
             else:
-                return self._build_playlist_from_all_files()
+                return self._build_playlist_from_path()
         else:
-            return self._build_playlist_from_all_files()
+            return self._build_playlist_from_path()
 
-    def _build_playlist_from_all_files(self):
+    def _build_playlist_from_path(self):
         """Search all the file reader paths for movie files with the provided
         extensions.
         """
         # Get list of paths to search from the file reader.
-        paths = self._reader.search_paths()
+        paths = self._frT.get_paths()
         # Enumerate all movie files inside those paths.
         movies = []
         for path in paths:
@@ -224,8 +236,8 @@ class VideoLooper:
         # or if no movies are available show the idle message.
         self._pgT.blank_screen()
         self._firstStart = True
-        if playlist.length() > 0:
-            self._pgT.animate_countdown(playlist.length())
+        if len(playlist) > 0:
+            self._pgT.animate_countdown(len(playlist))
             self._pgT.blank_screen()
         else:
             self._pgT.display_idle_message()
@@ -249,10 +261,28 @@ class VideoLooper:
         while self._running:
             cmd = self.commandQueue.get()
             if(isinstance(cmd, GlobalToken)):
-                if(cmd.getCmd() == "exit"):
-                    self.quit()
+                cmd = cmd.getCmd()
+                if cmd == "exit":
+                    self._running = False
+                elif cmd == "reload":
+                    logging.debug("reloading payer, rebuilding playlist with these paths: {} then stopping / starting player".format(self._frT.get_paths()))
+                    playlist = self._build_playlist()
+                    logging.debug("playlist ({}): {} ".format(len(playlist), playlist))
             elif(isinstance(cmd, PlayerToken)):
                 print("playertoken: "+cmd.getCmd())
+
+        ##CLEANUP
+        logging.debug("cleanup threads")
+        try:
+            self._pgT.quit()
+            self._plT.quit()
+            self._frT.quit()
+        except Exception as e:
+            logging.debug(e)
+        
+        self._pgT.join()
+        self._plT.join()
+        self._frT.join()
 
     def old_run(self):
         """Main program loop.  Will never return!"""
@@ -286,13 +316,13 @@ class VideoLooper:
                         infotext = '{0} time{1} (player counts loops)'.format(movie.repeats, "s" if movie.repeats>1 else "")
                     else:
                         infotext = '{0}/{1}'.format(movie.playcount, movie.repeats)
-                    if playlist.length()==1:
+                    if len(playlist)==1:
                         infotext = '(endless loop)'
 
                     # Start playing the first available movie.
                     self._print('Playing movie: {0} {1}'.format(movie, infotext))
                     # todo: maybe clear screen to black so that background (image/color) is not visible for videos with a resolution that is < screen resolution
-                    self._player.play(movie, loop=-1 if playlist.length()==1 else None, vol = self._sound_vol)
+                    self._player.play(movie, loop=-1 if len(playlist)==1 else None, vol = self._sound_vol)
 
             # Check for changes in the file search path (like USB drives added)
             # and rebuild the playlist.
@@ -315,18 +345,28 @@ class VideoLooper:
 
     def quit(self):
         """Shut down the program"""
-        logging.debug("quitting videolooper")
-        self._running = False
-        self._pgT.quit()
-        if self._player is not None:
-            self._player.stop()
+        logging.debug("stopping videolooper")
+        self.commandQueue.put(self._tokenGen.createToken("global", "exit"))
 
 
 
     def signal_quit(self, signal, frame):
         """Shut down the program, meant to by called by signal handler."""
         self._print("received signal to quit")
+        #self.dumpstacks(signal,frame)
         self.quit()
+
+    def dumpstacks(self, signal, frame):
+        print ("dumpstacks")
+        id2name = dict([(th.ident, th.name) for th in threading.enumerate()])
+        code = []
+        for threadId, stack in sys._current_frames().items():
+            code.append("\n# Thread: %s(%d)" % (id2name.get(threadId,""), threadId))
+            for filename, lineno, name, line in traceback.extract_stack(stack):
+                code.append('File: "%s", line %d, in %s' % (filename, lineno, name))
+                if line:
+                    code.append("  %s" % (line.strip()))
+        print ("\n".join(code))
 
 # Main entry point.
 if __name__ == '__main__':
