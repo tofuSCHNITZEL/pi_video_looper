@@ -39,8 +39,9 @@ class FileReaderThread(Thread):
         logging.debug("processing paths")
         copyMode = self._config.get('copymode', 'mode')
         if copyMode in ["add", "replace"]:
-            logging.debug("executing copymode")
-        self._commandQueue.put(self._tokenGen.createToken("global", "reload"))
+            self._commandQueue.put(self._tokenGen.createToken("global", "copy"))
+        else:
+            self._commandQueue.put(self._tokenGen.createToken("global", "reload"))
                     
     def get_paths(self):
         return self._searchPaths

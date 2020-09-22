@@ -29,6 +29,8 @@ class PygameThread(Thread):
         logging.debug("quitting pygame thread")
         pygame.event.post(pygame.event.Event(pygame.QUIT))
     
+    def get_screen(self):
+        return self._screen
 
     def blank_screen(self):
         """Render a blank screen filled with the background color."""
@@ -45,14 +47,14 @@ class PygameThread(Thread):
         #    return
         ##TODO##
         # Display idle message in center of screen.
-        label = self.render_text(message)
+        label = self._render_text(message)
         lw, lh = label.get_size()
         sw, sh = self._screen.get_size()
         self._screen.fill(self._bgcolor)
         self._screen.blit(label, (int(sw/2-lw/2), int(sh/2-lh/2)))
         pygame.display.update()
 
-    def render_text(self, message, font=None):
+    def _render_text(self, message, font=None):
         """Draw the provided message and return as pygame surface of it rendered
         with the configured foreground and background color.
         """
@@ -85,12 +87,12 @@ class PygameThread(Thread):
         #    return
         # Draw message with number of movies loaded and animate countdown.
         # First render text that doesn't change and get static dimensions.
-        label1 = self.render_text(message + ' Starting playback in:')
+        label1 = self._render_text(message + ' Starting playback in:')
         l1w, l1h = label1.get_size()
         sw, sh = self._screen.get_size()
         for i in range(self._config.getint('video_looper', 'countdown_time'), 0, -1):
             # Each iteration of the countdown rendering changing text.
-            label2 = self.render_text(str(i), self._big_font)
+            label2 = self._render_text(str(i), self._big_font)
             l2w, l2h = label2.get_size()
             # Clear screen and draw text with line1 above line2 and all
             # centered horizontally and vertically.
@@ -109,7 +111,7 @@ class PygameThread(Thread):
         #if not self._osd:
         #    return
         # Display idle message in center of screen.
-        label = self.render_text(message)
+        label = self._render_text(message)
         lw, lh = label.get_size()
         sw, sh = self._screen.get_size()
         self._screen.fill(self._bgcolor)

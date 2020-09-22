@@ -51,11 +51,11 @@ class Playlist:
         after reaching end.
         """
         # Check if no movies are in the playlist and return nothing.
-        if len(self._movies) == 0:
+        if len(self) == 0:
             return None
         # Start Random movie
         if is_random:
-            self._index = random.randrange(0, self.length())
+            self._index = random.randrange(0, len(self))
         else:
             # Start at the first movie and increment through them in order.
             if self._index is None:
@@ -63,7 +63,7 @@ class Playlist:
             else:
                 self._index += 1
             # Wrap around to the start after finishing.
-            if self._index >= self.length():
+            if self._index >= len(self):
                 self._index = 0
 
         return self._movies[self._index]
@@ -72,9 +72,9 @@ class Playlist:
         return len(self._movies)
 
     def __str__(self):
-        info = "Playlist: "
+        info = "Playlist ({}): ".format(len(self))
         for movie in self._movies:
-            info = info + str(movie)
+            info = info + str(movie) + " "
         return info
 
 class ControlTokenFactory:
@@ -113,7 +113,7 @@ class PlayerToken(ControlToken):
 #            self.cmd = cmd
 
 class GlobalToken(ControlToken):
-    cmds = ["exit", ""]
+    cmds = ["exit", "reload", "copy"]
     def setCmd(self, cmd):
         if cmd in self.cmds:
             self.cmd = cmd

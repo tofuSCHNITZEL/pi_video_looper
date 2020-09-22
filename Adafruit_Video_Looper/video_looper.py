@@ -23,7 +23,7 @@ from .playlist_builders import build_playlist_m3u
 from .pygameThread import PygameThread
 from .playerThread import PlayerThread
 from .filereaderThread import FileReaderThread
-
+from .file_transfer import FileTransfer
 
 # Basic video looper architecure:
 #
@@ -82,6 +82,7 @@ class VideoLooper:
         except Exception as e:
             logging.debug(e) 
             self.quit()
+
         # Initialize player thread
         try:
             playerReady = threading.Event()
@@ -119,7 +120,9 @@ class VideoLooper:
         # default value to 0 millibels (omxplayer)
         self._sound_vol = 0
         # Set other static internal state.
-        self._extensions = '|'.join(self._config.get('omxplayer','extensions'))
+        self._extensions = '|'.join(self._config.get(self._config.get('video_looper', 'video_player'), 'extensions') \
+                                 .translate(str.maketrans('','', ' \t\r\n.')) \
+                                 .split(','))
         #self._extensions = '|'.join(self._player.supported_extensions())
 
         self._running    = True
@@ -268,6 +271,14 @@ class VideoLooper:
                     logging.debug("reloading payer, rebuilding playlist with these paths: {} then stopping / starting player".format(self._frT.get_paths()))
                     playlist = self._build_playlist()
                     logging.debug("playlist ({}): {} ".format(len(playlist), playlist))
+                elif cmd == "copy":
+                    logging.debug("handling copymode")
+                    fc = FileTransfer(self._config, self._pgT.get_screen())
+                    fc.copy_files(self._frT.get_paths())
+                    logging.debug("copy mode done")
+                    #after its done:
+                    self.commandQueue.put(self._tokenGen.createToken("global", "reload"))
+            
             elif(isinstance(cmd, PlayerToken)):
                 print("playertoken: "+cmd.getCmd())
 

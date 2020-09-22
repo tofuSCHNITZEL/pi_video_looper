@@ -7,27 +7,18 @@ import shutil
 import re
 import pygame
 import time
-from .usb_drive_mounter import USBDriveMounter
 
 
-class USBDriveReaderCopy(object):
+class FileTransfer(object):
 
     def __init__(self, config, screen):
-        """Create an instance of a file reader that uses the USB drive mounter
-        service to keep track of attached USB drives and automatically mount
-        them for reading videos.
-        """
         self._config = config
         self._screen = screen
         self._load_config(config)
         self._pygame_init(config)
-        self._mounter = USBDriveMounter(root=self._mount_path,
-                                        readonly=self._readonly)
-        self._mounter.start_monitor()
 
         if not os.path.exists(self._target_path):
             os.makedirs(self._target_path)
-        #subprocess.call(['mkdir', self._target_path])
 
     def _pygame_init(self, config):
         self._bgcolor = (52,52,52)
@@ -52,45 +43,52 @@ class USBDriveReaderCopy(object):
 
     def _load_config(self, config):
         self._mount_path = config.get('usb_drive', 'mount_path')
-        self._readonly = config.getboolean('usb_drive', 'readonly')
         self._target_path = config.get('directory', 'path')
         self._copy_mode = config.get('copymode', 'mode')
         self._copyloader = config.getboolean('copymode', 'copyloader')
         self._password = config.get('copymode', 'password')
 
         #needs to be changed to a more generic approach to support other players
-        self._extensions = '|'.join(config.get(self._config.get('video_looper', 'video_player'), 'extensions') \
+        self._extensions = '|'.join(config.get(config.get('video_looper', 'video_player'), 'extensions') \
                                  .translate(str.maketrans('','', ' \t\r\n.')) \
                                  .split(','))
 
-    def copy_files(self, paths):
-        self.clear_screen()
+    #this is called from the outside
+    def copy_files(self, sourcepaths):
+        self._clear_screen()
 
         copy_mode = self._copy_mode
         copy_mode_info = "(from config)"
-        for path in paths:
+        for path in sourcepaths:
             if not os.path.exists(path) or not os.path.isdir(path):
                 continue
 
+            ##sanitycheck for source = target
+            #if  in path:
+            #    self._draw_info_text("source {} and target {} are the same".format(path,self._target_path))
+            #    time.sleep(5)
+            #    self._clear_screen()
+            #    continue
+
             #check password
             if not self._password == "":
-                if not self.check_file_exists('{0}/{1}'.format(path.rstrip('/'), self._password)):
+                if not self._check_file_exists('{0}/{1}'.format(path.rstrip('/'), self._password)):
                     continue
 
             #override copymode?
-            if self.check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'replace')):
+            if self._check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'replace')):
                 copy_mode = "replace"
                 copy_mode_info = "(overridden)"
-            if self.check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'add')):
+            if self._check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'add')):
                 copy_mode = "add"
                 copy_mode_info = "(overridden)"
-            if self.check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'replace')) \
-                    and self.check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'add')):
+            if self._check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'replace')) \
+                    and self._check_file_exists('{0}/{1}'.format(path.rstrip('/'), 'add')):
                 copy_mode = self._copy_mode
                 copy_mode_info = "(from config)"
 
             #inform about copymode
-            self.draw_info_text("Mode: " + copy_mode + " " + copy_mode_info)
+            self._draw_info_text("Mode: " + copy_mode + " " + copy_mode_info)
 
             if copy_mode == "replace":
                 # iterate over target path for deleting:
@@ -102,18 +100,18 @@ class USBDriveReaderCopy(object):
             for x in os.listdir(path):
                 if x[0] is not '.' and re.search('\.{0}$'.format(self._extensions), x, flags=re.IGNORECASE):
                     #copy file
-                    self.copy_with_progress('{0}/{1}'.format(path.rstrip('/'), x), '{0}/{1}'.format(self._target_path.rstrip('/'), x))
+                    self._copy_with_progress('{0}/{1}'.format(path.rstrip('/'), x), '{0}/{1}'.format(self._target_path.rstrip('/'), x))
 
             #copy loader image
             if self._copyloader:
                 loader_file_path = '{0}/{1}'.format(path.rstrip('/'), 'loader.png')
                 if os.path.exists(loader_file_path):
-                    self.clear_screen()
-                    self.draw_info_text("Copying splashscreen file...")
+                    self._clear_screen()
+                    self._draw_info_text("Copying splashscreen file...")
                     time.sleep(2)
-                    self.copy_with_progress(loader_file_path,'/home/pi/loader.png')
+                    self._copy_with_progress(loader_file_path,'/home/pi/loader.png')
                     
-    def draw_copy_progress(self, copied, total):
+    def _draw_copy_progress(self, copied, total):
         perc = 100 * copied / total
         assert (isinstance(perc, float))
         assert (0. <= perc <= 100.)
@@ -129,22 +127,22 @@ class USBDriveReaderCopy(object):
         #progress
         pygame.draw.rect(self._screen, self._fgcolor, progressrect)
         #progress_text
-        self.draw_progress_text(str(int(round(perc)))+"%")
+        self._draw_progress_text(str(int(round(perc)))+"%")
 
         pygame.display.update(self.borderrect)
 
-    def draw_info_text(self, message):
+    def _draw_info_text(self, message):
         label1 = self._font.render(message, True, self._fontcolor, self._bgcolor)
         l1w, l1h = label1.get_size()
         self._screen.blit(label1, (self.screenwidth / 2 - l1w / 2, self.screenheight / 2 - l1h - self.pheight/2 - 3*self.borderthickness))
         pygame.display.update()
 
-    def draw_progress_text(self, progress):
+    def _draw_progress_text(self, progress):
         label1 = self._font.render(progress, True, self._bgcolor, self._fgcolor)
         l1w, l1h = label1.get_size()
         self._screen.blit(label1, (self.screenwidth / 2 - l1w / 2, self.screenheight / 2 - l1h / 2 + self.borderthickness))
 
-    def clear_screen(self, full=True):
+    def _clear_screen(self, full=True):
         if full:
             self._screen.fill(self._bgcolor)
             pygame.display.update()
@@ -153,10 +151,10 @@ class USBDriveReaderCopy(object):
             pygame.display.update(self.borderrect)
 
     #checks for file without and with any extension
-    def check_file_exists(self,file):
+    def _check_file_exists(self,file):
         return (glob.glob(file + ".*") + glob.glob(file)) != []
 
-    def copyfile(self, src, dst, *, follow_symlinks=True):
+    def _copyfile(self, src, dst, *, follow_symlinks=True):
         """Copy data from src to dst.
 
         If follow_symlinks is not set and src is a symbolic link, a new
@@ -183,10 +181,10 @@ class USBDriveReaderCopy(object):
             size = os.stat(src).st_size
             with open(src, 'rb') as fsrc:
                 with open(dst, 'wb') as fdst:
-                    self.copyfileobj(fsrc, fdst, callback=self.draw_copy_progress, total=size)
+                    self._copyfileobj(fsrc, fdst, callback=self._draw_copy_progress, total=size)
         return dst
 
-    def copyfileobj(self, fsrc, fdst, callback, total, length=16 * 1024):
+    def _copyfileobj(self, fsrc, fdst, callback, total, length=16 * 1024):
         copied = 0
         while True:
             buf = fsrc.read(length)
@@ -196,41 +194,13 @@ class USBDriveReaderCopy(object):
             copied += len(buf)
             callback(copied, total=total)
 
-    def copy_with_progress(self, src, dst, *, follow_symlinks=True):
+    def _copy_with_progress(self, src, dst, *, follow_symlinks=True):
         if os.path.isdir(dst):
             dst = os.path.join(dst, os.path.basename(src))
 
         # clear screen before copying
-        self.clear_screen(False)
+        self._clear_screen(False)
 
-        self.copyfile(src, dst, follow_symlinks=follow_symlinks)
+        self._copyfile(src, dst, follow_symlinks=follow_symlinks)
         # shutil.copymode(src, dst)
         return dst
-
-    def search_paths(self):
-        """Return a list of paths to search for files. Will return a list of all
-        mounted USB drives.
-        """
-        if(self._mounter.has_nodes()):
-            self._mounter.mount_all()
-            self.copy_files(glob.glob(self._mount_path + '*'))
-
-        return [self._target_path]
-
-    def is_changed(self):
-        """Return true if the file search paths have changed, like when a new
-        USB drive is inserted.
-        """
-        if self._mounter.poll_changes() and self._mounter.has_nodes():
-            return True
-        else:
-            return False
-
-    def idle_message(self):
-        """Return a message to display when idle and no files are found."""
-        return 'Insert USB drive with compatible movies. Copy Mode: files will be copied to RPi.'
-
-
-def create_file_reader(config, screen):
-    """Create new file reader based on mounting USB drives."""
-    return USBDriveReaderCopy(config, screen)
