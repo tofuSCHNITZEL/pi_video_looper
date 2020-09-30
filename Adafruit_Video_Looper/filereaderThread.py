@@ -25,8 +25,9 @@ class FileReaderThread(Thread):
             self._usbMounter = USBDriveMounter(self._config.get('usb_drive', 'mount_path'), 
                                                self._config.getboolean('usb_drive', 'readonly'),
                                                self._mountHandler,
-                                               self._unschedule_all_watchers)
-        
+                                               self._unschedule_all_watchers,
+                                               self._processPaths)
+                                               
         self._observer = Observer()
         logging.debug("using observer type: "+str(type(self._observer).__name__))
         self._observer_event_handler = Handler(self._processPaths)
@@ -51,6 +52,7 @@ class FileReaderThread(Thread):
     def _unschedule_all_watchers(self):
         logging.debug("unschedule watchers")
         self._observer.unschedule_all()
+        ###TODO: sollte eigentlich nur bei nicht copymode emittet werden:
 
     def _mountHandler(self, mountedPath):
         copyMode = self._config.get('copymode', 'mode')

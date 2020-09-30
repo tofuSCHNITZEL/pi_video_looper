@@ -33,7 +33,7 @@ class Playlist:
     def __init__(self, movies):
         """Create a playlist from the provided list of movies."""
         self._movies = movies
-        self._index = None
+        self._index = 0
         self._skip = False
 
     def get_next(self, is_random = False) -> Movie:
@@ -47,28 +47,14 @@ class Playlist:
         # Start Random movie
         if is_random:
             self._index = random.randrange(0, len(self))
-        elif not self._skip:
-            # Start at the first movie and increment through them in order.
-            if self._index is None:
-                self._index = 0
-            elif self._movies[self._index].is_done():
-                #check if movie has played often enough^
-                self._movies[self._index].clear_playcount()
-                self._index += 1
+        else:
+            self._index += 1
             # Wrap around to the start after finishing.
             if self._index >= len(self):
                 self._index = 0
         
-        self._skip = False
         return self._movies[self._index]
-    
-    def skip_current(self):
-        self._movies[self._index].playcount = 0 #seems kinda hacky to me....
-        self._index += 1
-        if self._index >= len(self):
-            self._index = 0
-        self._skip = True
-        
+
     def __len__(self):
         return len(self._movies)
 

@@ -6,7 +6,7 @@ import time, os, glob, subprocess, pyudev, logging
 class USBDriveMounter:
     """Service for automatically mounting attached USB drives."""
 
-    def __init__(self, root='/mnt/usbdrive', readonly=True, mountFunction = None, umountFunction = None):
+    def __init__(self, root='/mnt/usbdrive', readonly=True, mountFunction = None, preUnmountFunction = None, postUnmountFunction = None):
         """Create an instance of the USB drive mounter service.  Root is an
         optional parameter which specifies the location and file name prefix for
         mounted drives (a number will be appended to each mounted drive file
@@ -18,8 +18,9 @@ class USBDriveMounter:
         self._mountroot = root.rstrip(os.path.sep)
         self._readonly = readonly
         self._context = pyudev.Context()
-        self.umountFunction = umountFunction
         self.mountFunction = mountFunction
+        self.preUnmountFunction = preUnmountFunction
+        self.postUnmountFunction = postUnmountFunction
         self._mounts = {}
 
         """Initialize monitoring of USB drive changes."""
@@ -29,7 +30,6 @@ class USBDriveMounter:
 
     def remove_all(self):
         """Unmount and remove mount points for all mounted drives."""
-        if self.umountFunction is not None: self.umountFunction()
         logging.debug("unmounting all drives")
         for device in list(self._mounts):
             self._unmount(device)
@@ -56,12 +56,14 @@ class USBDriveMounter:
         return mountpath
 
     def _unmount(self, device):
+        if self.preUnmountFunction: self.preUnmountFunction()
         if device in self._mounts.keys():
             mountpath = self._mounts[device]
             logging.debug("unmounting {} from {}".format(device, mountpath))
             if subprocess.run(['umount', '-l', mountpath]).returncode == 0:
                 subprocess.run(['rm', '-r', mountpath])
             del self._mounts[device]
+        if self.postUnmountFunction: self.postUnmountFunction()
 
 
     def _mount_all(self):
