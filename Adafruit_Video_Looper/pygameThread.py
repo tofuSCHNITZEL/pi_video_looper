@@ -130,7 +130,6 @@ class PygameThread(Thread):
         self._big_font   = pygame.font.Font(None, 250)
 
         self.blank_screen()
-        time.sleep(5)
         self.ready.set()
 
         while self._run:

@@ -76,7 +76,7 @@ class VideoLooper:
             logging.debug("starting pygame thread")
             self._pgT.start()
             logging.debug("waiting for pygame thread warmup")
-            #pygameReady.wait()
+            pygameReady.wait()
             logging.debug("pygame ready")
         except Exception as e:
             logging.debug(e) 

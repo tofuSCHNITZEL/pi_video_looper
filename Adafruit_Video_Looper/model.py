@@ -14,16 +14,6 @@ class Movie:
         self.filename = filename
         self.title = title
         self.repeats = int(repeats)
-        self.playcount = 1
-
-    def was_played(self):
-        self.playcount += 1
-
-    def clear_playcount(self):
-        self.playcount = 1
-
-    def is_done(self):
-        return self.playcount > self.repeats
 
     def __lt__(self, other):
         return self.filename < other.filename
