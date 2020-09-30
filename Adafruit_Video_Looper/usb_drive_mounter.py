@@ -6,7 +6,7 @@ import time, os, glob, subprocess, pyudev, logging
 class USBDriveMounter:
     """Service for automatically mounting attached USB drives."""
 
-    def __init__(self, root='/mnt/usbdrive', readonly=True, umountFunction = None, mountFunction = None):
+    def __init__(self, root='/mnt/usbdrive', readonly=True, mountFunction = None, umountFunction = None):
         """Create an instance of the USB drive mounter service.  Root is an
         optional parameter which specifies the location and file name prefix for
         mounted drives (a number will be appended to each mounted drive file
@@ -15,47 +15,59 @@ class USBDriveMounter:
         umountFunction is called before unmounting
         mountFunction is called after mounting
         """
-        self._root = root
-        if self._root.endswith(os.path.sep):
-            self._root = self._root[:-1]
+        self._mountroot = root.rstrip(os.path.sep)
         self._readonly = readonly
         self._context = pyudev.Context()
         self.umountFunction = umountFunction
         self.mountFunction = mountFunction
+        self._mounts = {}
 
         """Initialize monitoring of USB drive changes."""
         self._monitor = pyudev.Monitor.from_netlink(self._context)
         self._monitor.filter_by('block', 'partition')
-        self._observer = pyudev.MonitorObserver(self._monitor, self._monitor_mount)
+        self._observer = pyudev.MonitorObserver(self._monitor, self._monitor_mount, name="USBDriveMounter")
 
     def remove_all(self):
         """Unmount and remove mount points for all mounted drives."""
         if self.umountFunction is not None: self.umountFunction()
         logging.debug("unmounting all drives")
-        for path in glob.glob(self._root + os.path.sep + '*'):
-            logging.debug("unmounting {}".format(path))
-            subprocess.call(['umount', '-l', path])
-            subprocess.call(['rm', '-r', path])
+        for device in list(self._mounts):
+            self._unmount(device)
 
     def _monitor_mount(self, action, device):
-        if device is not None and device['ID_BUS'] == 'usb':
-            self.remove_all()
-            # Mount each drive under the mount root.
-            self.mount_all()
+        if device is not None and device['ID_BUS'] == 'usb' and action == 'add':
+            self._mount(device.device_node)
+        elif device is not None and device['ID_BUS'] == 'usb' and action == 'remove':
+            self._unmount(device.device_node)
+
+    def _mount(self, device):
+        """mounts given device"""
+        mountIndex = len(self._mounts)
+        mountpath = self._mountroot + os.path.sep + str(mountIndex)
+        logging.debug("mounting device {} to {}".format(device, mountpath))
+        subprocess.run(['mkdir', '-p', mountpath])
+        mount = ['mount']
+        if self._readonly:
+            mount.append('-r')
+        mount.extend([device, mountpath])
+        subprocess.run(mount, check=True)
+        self._mounts[device] = mountpath
+        if self.mountFunction is not None: self.mountFunction(mountpath)
+        return mountpath
+
+    def _unmount(self, device):
+        if device in self._mounts.keys():
+            mountpath = self._mounts[device]
+            logging.debug("unmounting {} from {}".format(device, mountpath))
+            if subprocess.run(['umount', '-l', mountpath]).returncode == 0:
+                subprocess.run(['rm', '-r', mountpath])
+            del self._mounts[device]
 
 
-    def mount_all(self):
+    def _mount_all(self):
         """Mount all attached USB drives. """
-        for i, node in enumerate(self._nodes()):
-            path = self._root + os.path.sep + str(i)
-            logging.debug("mounting node {} to {}".format(node, path))
-            subprocess.call(['mkdir', '-p', path])
-            mount = ['mount']
-            if self._readonly:
-                mount.append('-r')
-            mount.extend([node, path])
-            subprocess.check_call(mount)
-        if self.mountFunction is not None: self.mountFunction()
+        for node in self._nodes():
+            self._mount(node)
 
     # Enumerate USB drive partitions by path like /dev/sda1, etc.
     def _nodes(self):
@@ -66,7 +78,8 @@ class USBDriveMounter:
         return self._nodes != []
 
     def start_monitor(self):
-        self.mount_all()
+        self.remove_all()
+        self._mount_all()
         self._observer.start()
 
     def stop_monitor(self):

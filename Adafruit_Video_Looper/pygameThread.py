@@ -29,9 +29,6 @@ class PygameThread(Thread):
         logging.debug("quitting pygame thread")
         pygame.event.post(pygame.event.Event(pygame.QUIT))
     
-    def get_screen(self):
-        return self._screen
-
     def blank_screen(self):
         """Render a blank screen filled with the background color."""
         self._screen.fill(self._bgcolor)
@@ -117,10 +114,10 @@ class PygameThread(Thread):
         self._screen.fill(self._bgcolor)
         self._screen.blit(label, (int(sw/2-lw/2), int(sh/2-lh/2)))
         # If keyboard control is enabled, display message about it
-        #if self._keyboard_control:
-        #    label2 = self.render_text('press ESC to quit')
-        #    l2w, l2h = label2.get_size()
-        #    self._screen.blit(label2, (sw/2-l2w/2, sh/2-l2h/2+lh))
+        if self._keyboard_control:
+            label2 = self._render_text('press ESC to quit')
+            l2w, l2h = label2.get_size()
+            self._screen.blit(label2, (sw/2-l2w/2, sh/2-l2h/2+lh))
         pygame.display.update()
 
     def run(self):
@@ -133,6 +130,7 @@ class PygameThread(Thread):
         self._big_font   = pygame.font.Font(None, 250)
 
         self.blank_screen()
+        time.sleep(5)
         self.ready.set()
 
         while self._run:
@@ -144,10 +142,15 @@ class PygameThread(Thread):
                     self._commandQueue.put(self._tokenGen.createToken("global", "exit"))
                 if event.key == pygame.K_k:
                     logging.info("k was pressed. skipping...")
+                    self.display_idle_message("skipping")
                     self._commandQueue.put(self._tokenGen.createToken("player", "skip"))
                 if event.key == pygame.K_s:
                     logging.info("s was pressed. stopping...")    
+                    self.display_idle_message("stopping")
                     self._commandQueue.put(self._tokenGen.createToken("player", "stop"))
+                if event.key == pygame.K_d:
+                    logging.info("d was pressed. debug...")    
+                    self._commandQueue.put(self._tokenGen.createToken("global", "debug"))
             if event.type == pygame.QUIT:
                 self._run = False
 

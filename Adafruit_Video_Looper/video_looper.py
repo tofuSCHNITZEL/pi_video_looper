@@ -23,7 +23,6 @@ from .playlist_builders import build_playlist_m3u
 from .pygameThread import PygameThread
 from .playerThread import PlayerThread
 from .filereaderThread import FileReaderThread
-from .file_transfer import FileTransfer
 
 # Basic video looper architecure:
 #
@@ -271,19 +270,26 @@ class VideoLooper:
                     logging.debug("reloading payer, rebuilding playlist with these paths: {} then stopping / starting player".format(self._frT.get_paths()))
                     playlist = self._build_playlist()
                     logging.debug("playlist ({}): {} ".format(len(playlist), playlist))
-                elif cmd == "copy":
-                    logging.debug("handling copymode")
-                    fc = FileTransfer(self._config, self._pgT.get_screen())
-                    fc.copy_files(self._frT.get_paths())
-                    logging.debug("copy mode done")
-                    #after its done:
-                    self.commandQueue.put(self._tokenGen.createToken("global", "reload"))
-            
+                    self._plT.playPlaylist(playlist)  
+                    ##start playing   
+                elif cmd == "debug":
+                    logging.debug(playlist)       
             elif(isinstance(cmd, PlayerToken)):
                 print("playertoken: "+cmd.getCmd())
+                cmd = cmd.getCmd()
+                if cmd == "skip":
+                    self._plT.skip()
+            elif(isinstance(cmd, DisplayToken)):
+                print("displaytoken: "+cmd.getCmd())
+                cmd = cmd.getCmd()
+                if cmd == "idle":
+                    print("idle")
+                elif cmd == "clear":
+                    self._pgT.blank_screen()
+                    #self._pgT.display_idle_message("waiting for files")
 
         ##CLEANUP
-        logging.debug("cleanup threads")
+        logging.debug("starting cleanup of threads")
         try:
             self._pgT.quit()
             self._plT.quit()

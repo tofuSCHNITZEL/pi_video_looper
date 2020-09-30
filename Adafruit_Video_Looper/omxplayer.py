@@ -73,35 +73,15 @@ class OMXPlayer:
             args.extend(['--subtitles', srt_path])
         args.append(movie.filename)       # Add movie file path.
         # Run omxplayer process and direct standard output to /dev/null.
-        self._process = subprocess.Popen(args,
-                                         stdout=open(os.devnull, 'wb'),
+        #self._process = subprocess.Popen(args,
+        #                                 stdout=open(os.devnull, 'wb'),
+        #                                 close_fds=True)
+        return subprocess.run(args, stdout=open(os.devnull, 'wb'),
                                          close_fds=True)
 
-    def is_playing(self):
-        """Return true if the video player is running, false otherwise."""
-        if self._process is None:
-            return False
-        self._process.poll()
-        return self._process.returncode is None
-
     def stop(self, block_timeout_sec=0):
-        """Stop the video player.  block_timeout_sec is how many seconds to
-        block waiting for the player to stop before moving on.
-        """
-        # Stop the player if it's running.
-        if self._process is not None and self._process.returncode is None:
-            # There are a couple processes used by omxplayer, so kill both
-            # with a pkill command.
-            subprocess.call(['pkill', '-9', 'omxplayer'])
-        # If a blocking timeout was specified, wait up to that amount of time
-        # for the process to stop.
-        start = time.time()
-        while self._process is not None and self._process.returncode is None:
-            if (time.time() - start) >= block_timeout_sec:
-                break
-            time.sleep(0)
-        # Let the process be garbage collected.
-        self._process = None
+        """Stop the video player."""
+        subprocess.call(['pkill', '-9', 'omxplayer'])
 
     @staticmethod
     def can_loop_count():

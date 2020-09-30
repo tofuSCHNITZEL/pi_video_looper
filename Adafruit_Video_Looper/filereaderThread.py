@@ -5,6 +5,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from .model import ControlTokenFactory, GlobalToken
 from .usb_drive_mounter import USBDriveMounter
+from .file_transfer import FileTransfer
 
 class FileReaderThread(Thread):
 
@@ -17,13 +18,14 @@ class FileReaderThread(Thread):
         self._run = True
         self._tokenGen = ControlTokenFactory()
         self._searchPaths = []
+        self._copyMode = self._config.get('copymode', 'mode')
 
         if self._config.getboolean('usb_drive', 'auto_mount'):
             logging.debug("creating usb mounter")
             self._usbMounter = USBDriveMounter(self._config.get('usb_drive', 'mount_path'), 
                                                self._config.getboolean('usb_drive', 'readonly'),
-                                               self._unschedule_all_watchers,
-                                               self._scheduleObservers)
+                                               self._mountHandler,
+                                               self._unschedule_all_watchers)
         
         self._observer = Observer()
         logging.debug("using observer type: "+str(type(self._observer).__name__))
@@ -37,11 +39,7 @@ class FileReaderThread(Thread):
 
     def _processPaths(self):
         logging.debug("processing paths")
-        copyMode = self._config.get('copymode', 'mode')
-        if copyMode in ["add", "replace"]:
-            self._commandQueue.put(self._tokenGen.createToken("global", "copy"))
-        else:
-            self._commandQueue.put(self._tokenGen.createToken("global", "reload"))
+        self._commandQueue.put(self._tokenGen.createToken("global", "reload"))
                     
     def get_paths(self):
         return self._searchPaths
@@ -54,6 +52,20 @@ class FileReaderThread(Thread):
         logging.debug("unschedule watchers")
         self._observer.unschedule_all()
 
+    def _mountHandler(self, mountedPath):
+        copyMode = self._config.get('copymode', 'mode')
+        if copyMode in ["add", "replace"] and mountedPath != []:
+            logging.debug('copyMode is active ({})'.format(copyMode))
+            self._unschedule_all_watchers()
+            #handle copyprocess
+            #todo: sanity check if path is set to same/kind of mountpath then do not copy
+            ft = FileTransfer(self._config)
+            ft.copy_files([mountedPath]) #pass list with single entry
+            logging.debug('copyMode done')
+            del ft
+            
+        self._scheduleObservers()
+
     def _scheduleObservers(self):
         self._updateSearchPaths()
         for location in self._searchPaths:
@@ -62,15 +74,17 @@ class FileReaderThread(Thread):
         self._processPaths()
 
     def run(self):
+        #genauer splitten zwischen copy mode und nicht copy mode...????
         logging.debug('starting filechange observer')
         self._observer.start()
         if self._usbMounter is not None:
             logging.debug("starting usb mounter")
             self._usbMounter.start_monitor()
             logging.debug("usb mounter started")
-        else:
-            logging.debug("scheduling observers")
-            self._scheduleObservers()
+            
+
+        logging.debug("scheduling observers")
+        self._scheduleObservers()
 
         self.ready.set()
 

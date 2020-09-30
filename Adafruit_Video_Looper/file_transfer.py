@@ -7,13 +7,12 @@ import shutil
 import re
 import pygame
 import time
-
+import logging
 
 class FileTransfer(object):
 
-    def __init__(self, config, screen):
+    def __init__(self, config):
         self._config = config
-        self._screen = screen
         self._load_config(config)
         self._pygame_init(config)
 
@@ -21,6 +20,7 @@ class FileTransfer(object):
             os.makedirs(self._target_path)
 
     def _pygame_init(self, config):
+        self._screen = pygame.display.get_surface()
         self._bgcolor = (52,52,52)
         self._fgcolor = (149,193,26)
         self._bordercolor = (255,255,255)
@@ -62,8 +62,8 @@ class FileTransfer(object):
         for path in sourcepaths:
             if not os.path.exists(path) or not os.path.isdir(path):
                 continue
-
-            ##sanitycheck for source = target
+            logging.debug('trying to copy from {}'.format(path))
+            ##todo: sanitycheck for source = target
             #if  in path:
             #    self._draw_info_text("source {} and target {} are the same".format(path,self._target_path))
             #    time.sleep(5)
@@ -73,6 +73,7 @@ class FileTransfer(object):
             #check password
             if not self._password == "":
                 if not self._check_file_exists('{0}/{1}'.format(path.rstrip('/'), self._password)):
+                    logging.debug('pw file dows not exist in {}. skipping...'.format(path))
                     continue
 
             #override copymode?
@@ -110,6 +111,8 @@ class FileTransfer(object):
                     self._draw_info_text("Copying splashscreen file...")
                     time.sleep(2)
                     self._copy_with_progress(loader_file_path,'/home/pi/loader.png')
+
+            self._clear_screen()
                     
     def _draw_copy_progress(self, copied, total):
         perc = 100 * copied / total
